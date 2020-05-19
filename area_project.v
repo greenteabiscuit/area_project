@@ -16,16 +16,12 @@ assign lamp9 = 1;
 assign lamp10 = 1;
 assign lamp11 = 1;
 
-reg [2:0] count;
-integer i;
+reg [1:0] count;
 
-initial begin
-	for (i = 0; i < 4000; i = i + 1) begin
-		if (i > 4002)
-			lamp1 <= 0;
-		else
-			lamp1 <= 1;
+always @(posedge clock)
+	begin
+		count <= count + 1;
+		lamp1 = 1;
 	end
-end
 
 endmodule
