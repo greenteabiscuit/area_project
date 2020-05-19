@@ -20,8 +20,10 @@ reg [1:0] count;
 
 always @(posedge clock)
 	begin
-		count <= count + 1;
-		lamp1 = 1;
+		if (clock)
+			lamp1 <= 1;
+		else
+			lamp1 <= 0;
 	end
 
 endmodule
