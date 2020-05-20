@@ -87,10 +87,19 @@ lx2 <=USBX;
 //waved <=waved+1;
 end
 
+// @REISHI diff
+reg out_clock = 0;
+reg [31:0] count_int = 0;
+
 always @(posedge CLK) begin
+count_int <= count_int + 1;
 // Generate ADC clock
 if(adcl<1)begin adcl<=1;end else begin adcl<=0; end
 if(daclock<1)begin daclock<=1;end else begin daclock<=0; end
+if (count_int == 125000000) begin
+	out_clock <= ~out_clock;
+	count_int <= 0;
+end
 //cnt2<=cnt2+1;
 //if(cnt2==0)begin waved<=waved+1; end
 
@@ -430,8 +439,8 @@ assign BLE = bl;
 assign STAT = lstat;
 assign WR = wr0;
 assign RD = rd0;
-assign WFSTAT =waved;
-assign ADCLK =adc;
+assign WFSTAT = out_clock;
+assign ADCLK = adc;
 //assign ADCLK = CLK;	
 assign DACOUT= dacoutreg;
 assign DCLK =daclock;
