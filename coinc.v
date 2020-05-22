@@ -23,8 +23,13 @@
 //		lx1
 // CLOCK 125MHz ADC CLOCK 62.5 MHz AD9214 10bits
 // PHA Analysis MODE : 7  --- 8 samples averaging /peak detection
+module coinc (
+	ADX,DX, CLK, CLK1, CEX, CEY, CE1, CE2, BHE, BLE,
+	TRIG, LEDP, DUMMY, WMODE, STAT,RD,WR,USBX,RXF,TXE,
+	WAVEX,WFSTAT,ADCLK, PWDN,DFS,OVR,DACOUT,DCLK, INSTAT);
+	
+input [1:0] INSTAT; // should be able to receive button input
 
-module coinc (ADX,DX, CLK, CLK1, CEX, CEY, CE1, CE2, BHE, BLE, TRIG, LEDP, DUMMY, WMODE, STAT,RD,WR,USBX,RXF,TXE,WAVEX,WFSTAT,ADCLK, PWDN,DFS,OVR,DACOUT,DCLK);
 input [9:0]WAVEX;
 inout [7:0] USBX;
 output [19:0]ADX;
@@ -43,7 +48,6 @@ input RXF,TXE,OVR;
 output ADCLK,PWDN,DFS;
 output [9:0]DACOUT;
 output DCLK;
-
 reg wall;
 reg [9:0] dacoutreg;
 reg daclock;
@@ -81,31 +85,29 @@ reg ledind; // external indicator
 reg [7:0] adcl;
 reg [11:0] timer;
 //reg [7:0] wdata;
-
 always @(posedge RD) begin
 lx2 <=USBX;
 //waved <=waved+1;
 end
 
-// @REISHI diff
-reg out_clock = 0;
 reg [31:0] count_int = 0;
+reg out_clock = 0;
+reg button_stat = 0;
 
 always @(posedge CLK) begin
-count_int <= count_int + 1;
+	count_int = count_int + 1;
+	if (count_int == 50000000) begin
+		out_clock = ~out_clock;
+		count_int = 0;
+	end
+
 // Generate ADC clock
 if(adcl<1)begin adcl<=1;end else begin adcl<=0; end
 if(daclock<1)begin daclock<=1;end else begin daclock<=0; end
-if (count_int == 125000000) begin
-	out_clock <= ~out_clock;
-	count_int <= 0;
-end
 //cnt2<=cnt2+1;
 //if(cnt2==0)begin waved<=waved+1; end
-
 //cnt2<=cnt2+1;
 //if(cnt2==0) begin waved<=waved+1; end
-
 if(adc==0 && adcl==0) begin
 // FADC DATA REFRESH
 w40<=w39;w39<=w38;w38<=w37;w37<=w36;w36<=w35;w35<=w34;w34<=w33;w33<=w32;w32<=w31;w31<=w30;
@@ -119,7 +121,6 @@ end
 else if(adcl==1)begin 
 adc<=1-adc;			// ADC Clock = 62.5MHz
 end
-
 // CHECK USB COMMAND and read into lx1
 if (RXF==0) begin	// RXF LOW if FIFO buffer of FT245 from PC is available 
 if (cntusb==0)begin	// counter clock to manipulate the data read
@@ -138,14 +139,12 @@ else begin
 cntusb<=cntusb+1; // wait until the cnt becomes zero.
 end
 end // RXF==0
-
 // READ transfer len set command #8
 else if (lx1==8) begin
 	lstat<=lx1;
 	rd0<=1; wr0<=0;
 	translen <=128; cnt<=0; cntusb<=0;
 end
-
 else if (lx1 ==7) begin //**** NORMAL MODE #7
 	lstat<=lx1;
 	rd0<=1; wr0<=0;
@@ -153,7 +152,6 @@ renewed<=0;
 cntusb<=0;
 cea<=0; ceb<=1; ocr<=0;
 bh<=0; bl<=0;
-
 if (cntmask>0) begin cntmask<=cntmask-1; end
 else 
 begin
@@ -167,7 +165,6 @@ end
 //if(wavg0<864 && wreq==0) begin // PULSE SKIP
 //cntmask<=2500; //skip ~200 us // 2014 Aug 15 20 us
 //end
-
 if(wreq==1) begin // after detecting threshold level
 if(wavg0>wavg) begin
 if(wavp<wavg0)begin wavp<=wavg0; 
@@ -180,23 +177,19 @@ else begin wreq<=2;
 cnt1<=wsum+wavg0; 
 //adrs<=wsum/512; //killed Aug15
 //waved<=wsum/512; //Killed Aug15
-
 adrs<=(wavp-wavg)/4; // Aug15 divide into quarter since DNL is not so good for fast ADC
 waved<=wavp/8-512; 
 //adrs<=wavp;
 //waved<=wavp/16;
 end // end of pulse, next sequence
 end
-
 if (wreq==2) begin // WMODE==0 assures data 
 if(cnt2<100)begin lstat<=5;end else begin lstat<=4; end
-
 if(cnt==1)begin
 	ocx<=0;ocy<=1; 
 end
 if(cnt==2)begin
 	 wd<=DX+1; // add one 
-
 end
 if(cnt==3)begin
 ocx<=1;ocy<=1; // high-Z read 
@@ -209,7 +202,6 @@ end
 if(cnt==5)begin
 	ocx<=0; ocy<=1;// ^OE ocx=0:  ^WE ocy=1: read mode
 end
-
 cnt<=cnt+1;
 cnt2<=cnt2+1;
 if(cnt2>20)begin	
@@ -222,13 +214,10 @@ if(cnt2>20)begin
 	wsum<=0;
 	wavp<=0;
 	ledind<=1-ledind; //indicator TOGGLE
-
 end
-
 end
 end
 end //****
-
 // CLEAR DATA COMMAND #1
 else if (lx1==1) begin
 	rd0<=1; wr0<=0;
@@ -258,9 +247,7 @@ else begin
 cnt<=cnt+1; // wait until the cnt becomes zero.
 end
 	wlld<=540; // trigger level initialization ~30/512 6% of full scale
-
 end //**** LX=1
-
 // ADDRESS COUNTER CLEAR -> #2
 else if (lx1==2) begin
 	lstat<=lx1;
@@ -280,7 +267,6 @@ ledind<=0; //indicator OFF
 waved<=0; // DEBUG DATA LED CLEAR
 cntmask<=0; // for waveform record
 end
-
 // READ INITIALIZATION command #4
 else if (lx1==4) begin
 	lstat<=lx1;
@@ -291,9 +277,6 @@ else if (lx1==4) begin
 //   cntmask<=0; // skip mask
 	cntmask<=64000000;
 end
-
-
-
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 // Waveform measurement #3
@@ -334,9 +317,7 @@ else if (lx1==17 && wreq==0) begin
 	ledind<=1; // LED INDICATOR ON
 	dacoutreg<=DX;
 	waved<=DX/16;
-
 	//if (adc==1)begin
-
 if(cntmask>0) begin
 adrs<=cnt1;
 cnt1<=cnt1+1;
@@ -344,7 +325,6 @@ cnt1<=cnt1+1;
 cntmask<=cntmask-1;
 end
 //end
-	 
 end
 else if (lx1==18 && wreq==0) begin
 	wlld<=wlld+4;
@@ -370,13 +350,10 @@ else if (lx1==6) begin
 	wr0<=1;
 	rd0<=1;
 end
-
-
 // READ FIFO DATA by 128 command #5
 else if (lx1==5 && translen>0 && TXE==0)begin
 	lstat<=lx1;
 	// This routine controls wr0
-
 if (cnt==0)begin
 wr0<=1;		// T7 must be > 50ns
 dox<=DX;
@@ -409,12 +386,10 @@ else if(cnt==24)begin //24
 translen<=translen-2;	// repeat until 128 bytes are tranfered to the FIFO
 cnt<=0; 				// T8 must be > 50ns
 end
-
 else begin
 cnt<=cnt+1; // wait until the cnt becomes zero.
 end
 end
-
 else begin
 	cntusb<=0;
 	ocx<=0;ocy<=1;
@@ -422,9 +397,7 @@ else begin
 	bh<=0; bl<=0;
 	rd0<=1; wr0<=0;
 end
-
 end
-
 assign USBX = (wr0)?dox:8'bz;
 assign ADX =adrs;
 assign CEX = ocx;
@@ -439,18 +412,9 @@ assign BLE = bl;
 assign STAT = lstat;
 assign WR = wr0;
 assign RD = rd0;
-assign WFSTAT = out_clock;
-assign ADCLK = adc;
+assign WFSTAT = INSTAT;
+assign ADCLK =adc;
 //assign ADCLK = CLK;	
 assign DACOUT= dacoutreg;
 assign DCLK =daclock;
-
 endmodule
-
-
-
-	// {{ALTERA_ARGS_BEGIN}} DO NOT REMOVE THIS LINE!
-	
-	// {{ALTERA_ARGS_END}} DO NOT REMOVE THIS LINE!
-	// {{ALTERA_IO_BEGIN}} DO NOT REMOVE THIS LINE!
-	// {{ALTERA_IO_END}} DO NOT REMOVE THIS LINE!f
