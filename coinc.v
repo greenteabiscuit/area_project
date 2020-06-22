@@ -24,7 +24,7 @@
 // CLOCK 125MHz ADC CLOCK 62.5 MHz AD9214 10bits
 // PHA Analysis MODE : 7  --- 8 samples averaging /peak detection
 
-module coinc (ADX,DX, CLK, CLK1, CEX, CEY, CE1, CE2, BHE, BLE, TRIG, LEDP, DUMMY, WMODE, STAT,RD,WR,USBX,RXF,TXE,WAVEX,WFSTAT,ADCLK, PWDN,DFS,OVR,DACOUT,DCLK);
+module coinc (ADX,DX, CLK, CLK1, CEX, CEY, CE1, CE2, BHE, BLE, TRIG, LEDP, DUMMY, WMODE, STAT,RD,WR,USBX,RXF,TXE,WAVEX,WFSTAT,ADCLK, PWDN,DFS,OVR,DACOUT,DCLK,SWIN0,SWIN1,SWIN2);
 input [9:0]WAVEX;
 inout [7:0] USBX;
 output [19:0]ADX;
@@ -43,29 +43,29 @@ input RXF,TXE,OVR;
 output ADCLK,PWDN,DFS;
 output [9:0]DACOUT;
 output DCLK;
-
+input SWIN0,SWIN1,SWIN2;
 reg wall;
 reg [9:0] dacoutreg;
 reg daclock;
 reg [19:0] adrs;
 reg [19:0] adrs1;
 reg [19:0] adrsrd;
-reg [23:0] wsum,wavp;
-reg [23:0] wavg,wavg0,wavg1;
+reg [23:0] sum; // to be compared with the discrimination level for the ID
+reg [23:0] wavg0,wavg1;
 reg [9:0] wlld; // Lower Level Discriminator
 reg [9:0] w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15,w16,w17,w18,w19;
 reg [9:0] w20,w21,w22,w23,w24,w25,w26,w27,w28,w29,w30,w31,w32,w33,w34,w35,w36,w37,w38,w39;
-//reg [7:0] w40,w41,w42,w43,w44,w45,w46,w47,w48,w49,w50,w51,w52,w53,w54,w55,w56,w57,w58,w59;
 reg [9:0] w40;
-//reg [7:0] w60,w61,w62,w63,w64,w65,w66,w67,w68,w69,w70,w71,w72,w73,w74,w75,w76,w77,w78,w79;
 reg [7:0] translen;
 reg [15:0] dix;
 reg [7:0] dox;
-reg [25:0] cnt;  // resolving time ---> 10us Sep2012
-reg [25:0] cntmask; // to skip data
+reg [15:0] dx0,dx1;
+
+reg [7:0] cnt; // was 25:0 before  
+reg [12:0] cntmask; // to skip data
 reg [4:0] cntusb;
-reg [19:0]cnt1;
-reg [25:0]cnt2;
+reg [17:0]cnt1; // changed to 1/4   to utilize quarter of the whole memory for each 
+reg [19:0]cnt2; // for clear command
 reg [15:0] wd;
 reg [7:0] ux1;
 reg [7:0] lx1,lx2,lx3,lx4;
@@ -79,7 +79,13 @@ reg wr0,rd0;
 reg adc;
 reg ledind; // external indicator
 reg [7:0] adcl;
-reg [11:0] timer;
+reg [12:0] timer;
+reg [11:0] i; // for loop 0~4095 
+reg [7:0] j; // for loop 0~255 
+reg [7:0] k; 
+reg [1:0] even;
+reg [7:0] phase;
+reg [9:0] round; // length of reference data
 //reg [7:0] wdata;
 
 always @(posedge RD) begin
@@ -87,24 +93,11 @@ lx2 <=USBX;
 //waved <=waved+1;
 end
 
-// @REISHI diff
-reg out_clock = 0;
-reg [31:0] count_int = 0;
-
 always @(posedge CLK) begin
-count_int <= count_int + 1;
 // Generate ADC clock
 if(adcl<1)begin adcl<=1;end else begin adcl<=0; end
 if(daclock<1)begin daclock<=1;end else begin daclock<=0; end
-if (count_int == 125000000) begin
-	out_clock <= ~out_clock;
-	count_int <= 0;
-end
-//cnt2<=cnt2+1;
-//if(cnt2==0)begin waved<=waved+1; end
 
-//cnt2<=cnt2+1;
-//if(cnt2==0) begin waved<=waved+1; end
 
 if(adc==0 && adcl==0) begin
 // FADC DATA REFRESH
@@ -119,9 +112,10 @@ end
 else if(adcl==1)begin 
 adc<=1-adc;			// ADC Clock = 62.5MHz
 end
-
+//overrides the command input
+if (SWIN0==0) begin waved<=255; end 
 // CHECK USB COMMAND and read into lx1
-if (RXF==0) begin	// RXF LOW if FIFO buffer of FT245 from PC is available 
+else if (RXF==0) begin	// RXF LOW if FIFO buffer of FT245 from PC is available 
 if (cntusb==0)begin	// counter clock to manipulate the data read
 cntusb<=cntusb+1;			// even if data is already read, some delay might exist
 rd0<=0; // read request
@@ -150,83 +144,7 @@ else if (lx1 ==7) begin //**** NORMAL MODE #7
 	lstat<=lx1;
 	rd0<=1; wr0<=0;
 renewed<=0;
-cntusb<=0;
-cea<=0; ceb<=1; ocr<=0;
-bh<=0; bl<=0;
 
-if (cntmask>0) begin cntmask<=cntmask-1; end
-else 
-begin
-if(w0>wlld && wreq==0) begin // Start when w0 is over the specified threshold level
-lstat<=4;
-cnt<=0;
-cnt2<=0;
-wreq<=1;
-wavg<=wavg1; // record baseline at here // wavg is calculated by adding successive 8 samples 
-end
-//if(wavg0<864 && wreq==0) begin // PULSE SKIP
-//cntmask<=2500; //skip ~200 us // 2014 Aug 15 20 us
-//end
-
-if(wreq==1) begin // after detecting threshold level
-if(wavg0>wavg) begin
-if(wavp<wavg0)begin wavp<=wavg0; 
-end
-// wavg1>wavg
-wsum<=wsum+w0-512;
-//wsum<=wsum+w7-wavg/8;
-end
-else begin wreq<=2; 
-cnt1<=wsum+wavg0; 
-//adrs<=wsum/512; //killed Aug15
-//waved<=wsum/512; //Killed Aug15
-
-adrs<=(wavp-wavg)/4; // Aug15 divide into quarter since DNL is not so good for fast ADC
-waved<=wavp/8-512; 
-//adrs<=wavp;
-//waved<=wavp/16;
-end // end of pulse, next sequence
-end
-
-if (wreq==2) begin // WMODE==0 assures data 
-if(cnt2<100)begin lstat<=5;end else begin lstat<=4; end
-
-if(cnt==1)begin
-	ocx<=0;ocy<=1; 
-end
-if(cnt==2)begin
-	 wd<=DX+1; // add one 
-
-end
-if(cnt==3)begin
-ocx<=1;ocy<=1; // high-Z read 
-dix<=wd;
-end
-if(cnt==4)begin
-	ocx<=1; ocy<=0;// ^OE ocx=1: high Z , ^WE ocy=0: write mode
-	 // write data 
-end
-if(cnt==5)begin
-	ocx<=0; ocy<=1;// ^OE ocx=0:  ^WE ocy=1: read mode
-end
-
-cnt<=cnt+1;
-cnt2<=cnt2+1;
-if(cnt2>20)begin	
-	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-   cnt1<=0;	// address increment
-	cnt<=0;
-	cnt2<=0;
-	wreq<=0; 
-	lstat<=5;
-	wsum<=0;
-	wavp<=0;
-	ledind<=1-ledind; //indicator TOGGLE
-
-end
-
-end
-end
 end //****
 
 // CLEAR DATA COMMAND #1
@@ -237,7 +155,7 @@ else if (lx1==1) begin
 	ledind<=1; //indicator ON
 if (cnt==0)begin
 cnt<=cnt+1;
-adrs<=cnt1;
+adrs<=cnt2;
 end
 else if(cnt==1)begin
 cnt<=cnt+1;
@@ -251,7 +169,7 @@ cnt<=cnt+1;
 end
 else if(cnt>2)begin
 //	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-	cnt1<=cnt1+1;	// adress increment
+	cnt2<=cnt2+1;	// adress increment
 	cnt<=0;
 end
 else begin
@@ -289,7 +207,7 @@ else if (lx1==4) begin
 	ocr<=1; // slave mode address is set to the USB read
 	adrsrd<=0; translen<=0; adrs<=0; cnt<=0;cnt1<=0;wreq<=0; // for measurement
 //   cntmask<=0; // skip mask
-	cntmask<=64000000;
+	cntmask<=8191;
 end
 
 
@@ -303,28 +221,40 @@ else if(lx1==3)begin
 	cntusb<=0;
 	ledind<=1; // LED INDICATOR ON
 timer<=timer+1;
-if(w0>wlld && cntmask==0)begin
-cntmask<=1000000;
-end
-if(timer==4095)begin
-if(cntmask>0) begin
-adrs<=cnt1;
-ocx<=1;ocy<=0; // write mode
-dix<=wavg0/8;
-//wall;
-waved<=w40/16; // not display data 
-cnt1<=cnt1+1;
-cntmask<=cntmask-1;
-end
-timer<=0;
+// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
+if(timer==8191)begin
+ adrs<=cnt1;
+ ocx<=1;ocy<=0; // write mode
+ dix<=wavg0/8;
+ //wall;
+ waved<=w40/16; // not display data 
+ cnt1<=cnt1+1;
+ cntmask<=cntmask-1;
+ timer<=0;
 end
 //end
 end
+///// Getting the reference data
 else if (lx1==16 && wreq==0) begin
-	wlld<=wlld+32;
-	wreq<=1;  // chattering free
-	waved<=wlld; 
+	lstat<=7;
+	rd0<=1; wr0<=0;
+	cntusb<=0;
+	ledind<=1; // LED INDICATOR ON
+timer<=timer+1;
+// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
+if(timer==8191)begin
+ adrs<=cnt1+262144; // put data in the 2nd part of the quad memories
+ ocx<=1;ocy<=0; // write mode
+ dix<=wavg0/8;
+ //wall;
+ waved<=w40/16; // not display data 
+ cnt1<=cnt1+1;
+ cntmask<=2048;
+ timer<=0;
 end
+
+end
+// DAC OUTPUT
 else if (lx1==17 && wreq==0) begin
 	lstat<=7;
 	rd0<=1; 
@@ -340,21 +270,53 @@ else if (lx1==17 && wreq==0) begin
 if(cntmask>0) begin
 adrs<=cnt1;
 cnt1<=cnt1+1;
-//lx4<=lx4+1;
+
 cntmask<=cntmask-1;
 end
 //end
 	 
 end
 else if (lx1==18 && wreq==0) begin
-	wlld<=wlld+4;
-	wreq<=1; // chattering free
-	waved<=wlld; 
+if(even==0) begin 
+	//lstat<=6;
+	rd0<=1; 
+	cntusb<=0;
+	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
+	cntusb<=0;
+	ledind<=1; // LED INDICATOR ON
+	dx0<=DX;
+	//waved<=DX/16;
+	adrs<=cnt1+262144+phase;
+	even<=even+1;
+end
+else if(even==1) begin
+	dx1<=DX;
+	//waved<=DX/16;
+	even<=even+1;
+end
+else if(even==2) begin
+	if(dx0>dx1) begin dx0<=dx0-dx1; end else begin dx0<=dx1-dx0; end
+	adrs<=cnt1;
+   even <=even+1;
+end
+
+else if(even==3) begin
+	sum <=sum+dx0;
+   even <=even+1;
+	cnt1<=cnt1+1;
+	adrs<=cnt1+1;
+	if (round>1023) begin round <=0;  phase <=phase+1; sum<=0;
+	// waved<=sum/524288;
+	if(sum/1024 <100) begin lstat<=7; waved<=sum/1024; end 
+   end
+
+cntmask<=cntmask-1;
+end
+
+
 end
 else if (lx1==19 && wreq==0) begin
-	wlld<=wlld-4;
-	wreq<=1; // chattering free
-	waved<=wlld; 
+ adrs<=262144; // reference area 
 end
 // IDLING #6 
 else if (lx1==6) begin
@@ -439,8 +401,8 @@ assign BLE = bl;
 assign STAT = lstat;
 assign WR = wr0;
 assign RD = rd0;
-assign WFSTAT = out_clock;
-assign ADCLK = adc;
+assign WFSTAT =waved;
+assign ADCLK =adc;
 //assign ADCLK = CLK;	
 assign DACOUT= dacoutreg;
 assign DCLK =daclock;
