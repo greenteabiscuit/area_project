@@ -94,296 +94,296 @@ lx2 <=USBX;
 end
 
 always @(posedge CLK) begin
-// Generate ADC clock
-if(adcl<1)begin adcl<=1;end else begin adcl<=0; end
-if(daclock<1)begin daclock<=1;end else begin daclock<=0; end
+	// Generate ADC clock
+	if(adcl<1)begin adcl<=1;end else begin adcl<=0; end
+	if(daclock<1)begin daclock<=1;end else begin daclock<=0; end
 
 
-if(adc==0 && adcl==0) begin
-// FADC DATA REFRESH
-w40<=w39;w39<=w38;w38<=w37;w37<=w36;w36<=w35;w35<=w34;w34<=w33;w33<=w32;w32<=w31;w31<=w30;
-w30<=w29;w29<=w28;w28<=w27;w27<=w26;w26<=w25;w25<=w24;w24<=w23;w23<=w22;w22<=w21;w21<=w20;w20<=w19;
-w19<=w18;w18<=w17;w17<=w16;w16<=w15;w15<=w14;w14<=w13;w13<=w12;w12<=w11;w11<=w10;
-w10<=w9;w9<=w8;w8<=w7;w7<=w6;w6<=w5;w5<=w4;w4<=w3;w3<=w2;w2<=w1;w1<=w0;
-wavg1<=(w39+w38+w37+w36+w35+w34+w33+w32);
-wavg0<=( w7+ w6+ w5+ w4+ w3+ w2+ w1+ w0);
-w0<=WAVEX; 
-end
-else if(adcl==1)begin 
-adc<=1-adc;			// ADC Clock = 62.5MHz
-end
-//overrides the command input
-if (SWIN0==0) begin waved<=255; end 
-// CHECK USB COMMAND and read into lx1
-else if (RXF==0) begin	// RXF LOW if FIFO buffer of FT245 from PC is available 
-if (cntusb==0)begin	// counter clock to manipulate the data read
-cntusb<=cntusb+1;			// even if data is already read, some delay might exist
-rd0<=0; // read request
-end
-else if(cntusb==5)begin
-rd0<=1; 
-cntusb<=cntusb+1;
-lx1<=USBX; // read from FIFO after 50ns of rd signal
-end
-else if(cntusb==7)begin
-cntusb<=0; 
-end
-else begin
-cntusb<=cntusb+1; // wait until the cnt becomes zero.
-end
-end // RXF==0
+	if(adc==0 && adcl==0) begin
+	// FADC DATA REFRESH
+		w40<=w39;w39<=w38;w38<=w37;w37<=w36;w36<=w35;w35<=w34;w34<=w33;w33<=w32;w32<=w31;w31<=w30;
+		w30<=w29;w29<=w28;w28<=w27;w27<=w26;w26<=w25;w25<=w24;w24<=w23;w23<=w22;w22<=w21;w21<=w20;w20<=w19;
+		w19<=w18;w18<=w17;w17<=w16;w16<=w15;w15<=w14;w14<=w13;w13<=w12;w12<=w11;w11<=w10;
+		w10<=w9;w9<=w8;w8<=w7;w7<=w6;w6<=w5;w5<=w4;w4<=w3;w3<=w2;w2<=w1;w1<=w0;
+		wavg1<=(w39+w38+w37+w36+w35+w34+w33+w32);
+		wavg0<=( w7+ w6+ w5+ w4+ w3+ w2+ w1+ w0);
+		w0<=WAVEX; 
+	end
+	else if(adcl==1)begin 
+		adc<=1-adc;			// ADC Clock = 62.5MHz
+	end
+	//overrides the command input
+	if (SWIN0==0) begin waved<=255; end 
+	// CHECK USB COMMAND and read into lx1
+	else if (RXF==0) begin	// RXF LOW if FIFO buffer of FT245 from PC is available 
+		if (cntusb==0)begin	// counter clock to manipulate the data read
+			cntusb<=cntusb+1;			// even if data is already read, some delay might exist
+			rd0<=0; // read request
+		end
+		else if(cntusb==5)begin
+			rd0<=1; 
+			cntusb<=cntusb+1;
+			lx1<=USBX; // read from FIFO after 50ns of rd signal
+		end
+		else if(cntusb==7)begin
+			cntusb<=0; 
+		end
+		else begin
+			cntusb<=cntusb+1; // wait until the cnt becomes zero.
+		end
+	end // RXF==0
 
-// READ transfer len set command #8
-else if (lx1==8) begin
-	lstat<=lx1;
-	rd0<=1; wr0<=0;
-	translen <=128; cnt<=0; cntusb<=0;
-end
+	// READ transfer len set command #8
+	else if (lx1==8) begin
+		lstat<=lx1;
+		rd0<=1; wr0<=0;
+		translen <=128; cnt<=0; cntusb<=0;
+	end
 
-else if (lx1 ==7) begin //**** NORMAL MODE #7
-	lstat<=lx1;
-	rd0<=1; wr0<=0;
-renewed<=0;
+	else if (lx1 ==7) begin //**** NORMAL MODE #7
+		lstat<=lx1;
+		rd0<=1; wr0<=0;
+		renewed<=0;
 
-end //****
+	end //****
 
-// CLEAR DATA COMMAND #1
-else if (lx1==1) begin
-	rd0<=1; wr0<=0;
-	cntusb<=0;
-	lstat<=lx1;
-	ledind<=1; //indicator ON
-if (cnt==0)begin
-cnt<=cnt+1;
-adrs<=cnt2;
-end
-else if(cnt==1)begin
-cnt<=cnt+1;
-ocx<=1;ocy<=1; // high-Z read
-dix<=0;
-end
-else if(cnt==2)begin
-cnt<=cnt+1;
-	ocx<=1; ocy<=0;// ^OE ocx=1: high Z , ^WE ocy=0: write mode
-	 // write data 
-end
-else if(cnt>2)begin
-//	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-	cnt2<=cnt2+1;	// adress increment
-	cnt<=0;
-end
-else begin
-cnt<=cnt+1; // wait until the cnt becomes zero.
-end
-	wlld<=540; // trigger level initialization ~30/512 6% of full scale
+	// CLEAR DATA COMMAND #1
+	else if (lx1==1) begin
+		rd0<=1; wr0<=0;
+		cntusb<=0;
+		lstat<=lx1;
+		ledind<=1; //indicator ON
+		if (cnt==0)begin
+			cnt<=cnt+1;
+			adrs<=cnt2;
+		end
+		else if(cnt==1)begin
+			cnt<=cnt+1;
+			ocx<=1;ocy<=1; // high-Z read
+			dix<=0;
+		end
+		else if(cnt==2)begin
+			cnt<=cnt+1;
+			ocx<=1; ocy<=0;// ^OE ocx=1: high Z , ^WE ocy=0: write mode
+			// write data 
+		end
+		else if(cnt>2)begin
+			//	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
+			cnt2<=cnt2+1;	// adress increment
+			cnt<=0;
+		end
+		else begin
+			cnt<=cnt+1; // wait until the cnt becomes zero.
+		end
+		wlld<=540; // trigger level initialization ~30/512 6% of full scale
 
-end //**** LX=1
+	end //**** LX=1
 
-// ADDRESS COUNTER CLEAR -> #2
-else if (lx1==2) begin
-	lstat<=lx1;
-	rd0<=1; wr0<=0;
-	cntusb<=0;
-	renewed<=0;
-	adrs<=0;
-	adrsrd<=0;
-	cnt1<=0;
-	cnt<=0;
-	ocx<=0; ocy<=1;
-	wd<=0;
-	cea<=0; ceb<=1;
-	bh<=0; bl<=0;
-	wreq<=0; // for measurement
-ledind<=0; //indicator OFF
-waved<=0; // DEBUG DATA LED CLEAR
-cntmask<=0; // for waveform record
-end
+	// ADDRESS COUNTER CLEAR -> #2
+	else if (lx1==2) begin
+		lstat<=lx1;
+		rd0<=1; wr0<=0;
+		cntusb<=0;
+		renewed<=0;
+		adrs<=0;
+		adrsrd<=0;
+		cnt1<=0;
+		cnt<=0;
+		ocx<=0; ocy<=1;
+		wd<=0;
+		cea<=0; ceb<=1;
+		bh<=0; bl<=0;
+		wreq<=0; // for measurement
+		ledind<=0; //indicator OFF
+		waved<=0; // DEBUG DATA LED CLEAR
+		cntmask<=0; // for waveform record
+	end
 
-// READ INITIALIZATION command #4
-else if (lx1==4) begin
-	lstat<=lx1;
-	rd0<=1; wr0<=0;
-	cntusb<=0;
-	ocr<=1; // slave mode address is set to the USB read
-	adrsrd<=0; translen<=0; adrs<=0; cnt<=0;cnt1<=0;wreq<=0; // for measurement
-//   cntmask<=0; // skip mask
-	cntmask<=8191;
-end
+	// READ INITIALIZATION command #4
+	else if (lx1==4) begin
+		lstat<=lx1;
+		rd0<=1; wr0<=0;
+		cntusb<=0;
+		ocr<=1; // slave mode address is set to the USB read
+		adrsrd<=0; translen<=0; adrs<=0; cnt<=0;cnt1<=0;wreq<=0; // for measurement
+		//   cntmask<=0; // skip mask
+		cntmask<=8191;
+	end
 
 
 
-////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////
-// Waveform measurement #3
-else if(lx1==3)begin	
-	lstat<=lx1;
-	rd0<=1; wr0<=0;
-	cntusb<=0;
-	ledind<=1; // LED INDICATOR ON
-timer<=timer+1;
-// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
-if(timer==8191)begin
- adrs<=cnt1;
- ocx<=1;ocy<=0; // write mode
- dix<=wavg0/8;
- //wall;
- waved<=w40/16; // not display data 
- cnt1<=cnt1+1;
- cntmask<=cntmask-1;
- timer<=0;
-end
-//end
-end
-///// Getting the reference data
-else if (lx1==16 && wreq==0) begin
-	lstat<=7;
-	rd0<=1; wr0<=0;
-	cntusb<=0;
-	ledind<=1; // LED INDICATOR ON
-timer<=timer+1;
-// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
-if(timer==8191)begin
- adrs<=cnt1+262144; // put data in the 2nd part of the quad memories
- ocx<=1;ocy<=0; // write mode
- dix<=wavg0/8;
- //wall;
- waved<=w40/16; // not display data 
- cnt1<=cnt1+1;
- cntmask<=2048;
- timer<=0;
-end
+	////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////
+	// Waveform measurement #3
+	else if(lx1==3)begin	
+		lstat<=lx1;
+		rd0<=1; wr0<=0;
+		cntusb<=0;
+		ledind<=1; // LED INDICATOR ON
+		timer<=timer+1;
+		// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
+		if(timer==8191)begin
+			adrs<=cnt1;
+			ocx<=1;ocy<=0; // write mode
+			dix<=wavg0/8;
+			//wall;
+			waved<=w40/16; // not display data 
+			cnt1<=cnt1+1;
+			cntmask<=cntmask-1;
+			timer<=0;
+		end
+		//end
+	end
+		///// Getting the reference data
+	else if (lx1==16 && wreq==0) begin
+			lstat<=7;
+			rd0<=1; wr0<=0;
+			cntusb<=0;
+			ledind<=1; // LED INDICATOR ON
+			timer<=timer+1;
+			// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
+		if(timer==8191)begin
+			adrs<=cnt1+262144; // put data in the 2nd part of the quad memories
+			ocx<=1;ocy<=0; // write mode
+			dix<=wavg0/8;
+			//wall;
+			waved<=w40/16; // not display data 
+			cnt1<=cnt1+1;
+			cntmask<=2048;
+			timer<=0;
+		end
 
-end
-// DAC OUTPUT
-else if (lx1==17 && wreq==0) begin
-	lstat<=7;
-	rd0<=1; 
-	cntusb<=0;
-	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-	cntusb<=0;
-	ledind<=1; // LED INDICATOR ON
-	dacoutreg<=DX;
-	waved<=DX/16;
+	end
+	// DAC OUTPUT
+	else if (lx1==17 && wreq==0) begin
+		lstat<=7;
+		rd0<=1; 
+		cntusb<=0;
+		ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
+		cntusb<=0;
+		ledind<=1; // LED INDICATOR ON
+		dacoutreg<=DX;
+		waved<=DX/16;
 
-	//if (adc==1)begin
+		//if (adc==1)begin
 
-if(cntmask>0) begin
-adrs<=cnt1;
-cnt1<=cnt1+1;
+		if(cntmask>0) begin
+			adrs<=cnt1;
+			cnt1<=cnt1+1;
 
-cntmask<=cntmask-1;
-end
-//end
+			cntmask<=cntmask-1;
+		end
+		//end
 	 
-end
-else if (lx1==18 && wreq==0) begin
-if(even==0) begin 
-	//lstat<=6;
-	rd0<=1; 
-	cntusb<=0;
-	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-	cntusb<=0;
-	ledind<=1; // LED INDICATOR ON
-	dx0<=DX;
-	//waved<=DX/16;
-	adrs<=cnt1+262144+phase;
-	even<=even+1;
-end
-else if(even==1) begin
-	dx1<=DX;
-	//waved<=DX/16;
-	even<=even+1;
-end
-else if(even==2) begin
-	if(dx0>dx1) begin dx0<=dx0-dx1; end else begin dx0<=dx1-dx0; end
-	adrs<=cnt1;
-   even <=even+1;
-end
+	end
+	else if (lx1==18 && wreq==0) begin
+		if(even==0) begin 
+			//lstat<=6;
+			rd0<=1; 
+			cntusb<=0;
+			ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
+			cntusb<=0;
+			ledind<=1; // LED INDICATOR ON
+			dx0<=DX;
+			//waved<=DX/16;
+			adrs<=cnt1+262144+phase;
+			even<=even+1;
+		end
+		else if(even==1) begin
+			dx1<=DX;
+			//waved<=DX/16;
+			even<=even+1;
+		end
+		else if(even==2) begin
+			if(dx0>dx1) begin dx0<=dx0-dx1; end else begin dx0<=dx1-dx0; end
+			adrs<=cnt1;
+			even <=even+1;
+		end
 
-else if(even==3) begin
-	sum <=sum+dx0;
-   even <=even+1;
-	cnt1<=cnt1+1;
-	adrs<=cnt1+1;
-	if (round>1023) begin round <=0;  phase <=phase+1; sum<=0;
-	// waved<=sum/524288;
-	if(sum/1024 <100) begin lstat<=7; waved<=sum/1024; end 
-   end
+		else if(even==3) begin
+			sum <=sum+dx0;
+			even <=even+1;
+			cnt1<=cnt1+1;
+			adrs<=cnt1+1;
+			if (round>1023) begin round <=0;  phase <=phase+1; sum<=0;
+				// waved<=sum/524288;
+				if(sum/1024 <100) begin lstat<=7; waved<=sum/1024; end 
+			end
 
-cntmask<=cntmask-1;
-end
-
-
-end
-else if (lx1==19 && wreq==0) begin
- adrs<=262144; // reference area 
-end
-// IDLING #6 
-else if (lx1==6) begin
-	lstat<=lx1;
-	rd0<=1; wr0<=0;
-	cntusb<=0;
-	ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-	renewed <=0;
-	cnt<=0;
-	cea<=0; ceb<=1;
-	bh<=0; bl<=0;
-	wd<=0;
-	wr0<=1;
-	rd0<=1;
-end
+			cntmask<=cntmask-1;
+		end
 
 
-// READ FIFO DATA by 128 command #5
-else if (lx1==5 && translen>0 && TXE==0)begin
-	lstat<=lx1;
-	// This routine controls wr0
+	end
+	else if (lx1==19 && wreq==0) begin
+		adrs<=262144; // reference area 
+	end
+	// IDLING #6 
+	else if (lx1==6) begin
+		lstat<=lx1;
+		rd0<=1; wr0<=0;
+		cntusb<=0;
+		ocx<=0; ocy<=1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
+		renewed <=0;
+		cnt<=0;
+		cea<=0; ceb<=1;
+		bh<=0; bl<=0;
+		wd<=0;
+		wr0<=1;
+		rd0<=1;
+	end
 
-if (cnt==0)begin
-wr0<=1;		// T7 must be > 50ns
-dox<=DX;
-cnt<=cnt+1;
-end
-else if(cnt==4)begin //5
-wr0<=0;					// T8 must be > 50ns
-cnt<=cnt+1;
-// status check
-//if (dox==33) begin lstat<=1; end else if (dox==97) begin lstat<=7; end else begin lstat<=0; end
-end
-else if (cnt==11)begin		// T12 must be >80ns 11
-//wr0<=1;
-dox<=(DX>>8);
-cnt<=cnt+1;
-end
-else if(cnt==12)begin //12
-wr0<=1;					// T7 must be > 50ns
-cnt<=cnt+1;
-end
-else if(cnt==17)begin //17
-wr0<=0;					// T7 must be > 50ns 
-cnt<=cnt+1;
-end
-else if(cnt==23)begin // 23
-adrs<=adrs+1;
-cnt<=cnt+1; 
-end
-else if(cnt==24)begin //24
-translen<=translen-2;	// repeat until 128 bytes are tranfered to the FIFO
-cnt<=0; 				// T8 must be > 50ns
-end
 
-else begin
-cnt<=cnt+1; // wait until the cnt becomes zero.
-end
-end
+	// READ FIFO DATA by 128 command #5
+	else if (lx1==5 && translen>0 && TXE==0)begin
+		lstat<=lx1;
+		// This routine controls wr0
 
-else begin
-	cntusb<=0;
-	ocx<=0;ocy<=1;
-	cea<=0; ceb<=1;
-	bh<=0; bl<=0;
-	rd0<=1; wr0<=0;
-end
+		if (cnt==0)begin
+			wr0<=1;		// T7 must be > 50ns
+			dox<=DX;
+			cnt<=cnt+1;
+		end
+		else if(cnt==4)begin //5
+			wr0<=0;					// T8 must be > 50ns
+			cnt<=cnt+1;
+			// status check
+			//if (dox==33) begin lstat<=1; end else if (dox==97) begin lstat<=7; end else begin lstat<=0; end
+		end
+		else if (cnt==11)begin		// T12 must be >80ns 11
+			//wr0<=1;
+			dox<=(DX>>8);
+			cnt<=cnt+1;
+		end
+		else if(cnt==12)begin //12
+			wr0<=1;					// T7 must be > 50ns
+			cnt<=cnt+1;
+		end
+		else if(cnt==17)begin //17
+			wr0<=0;					// T7 must be > 50ns 
+			cnt<=cnt+1;
+		end
+		else if(cnt==23)begin // 23
+			adrs<=adrs+1;
+			cnt<=cnt+1; 
+		end
+		else if(cnt==24)begin //24
+			translen<=translen-2;	// repeat until 128 bytes are tranfered to the FIFO
+			cnt<=0; 				// T8 must be > 50ns
+		end
+
+		else begin
+			cnt<=cnt+1; // wait until the cnt becomes zero.
+		end
+	end
+
+	else begin
+		cntusb<=0;
+		ocx<=0;ocy<=1;
+		cea<=0; ceb<=1;
+		bh<=0; bl<=0;
+		rd0<=1; wr0<=0;
+	end
 
 end
 
