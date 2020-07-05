@@ -226,7 +226,7 @@ always @(posedge CLK) begin
 		if(timer==8191)begin
 			adrs<=cnt1;
 			ocx<=1;ocy<=0; // write mode
-			dix<=wavg0/8;
+			dix<=200;
 			//wall;
 			waved<=w40/16; // not display data 
 			cnt1<=cnt1+1;
@@ -311,8 +311,9 @@ always @(posedge CLK) begin
 
 			// メモリの０から２の１８乗の間のメモリのところに実装するのでどうだろう
 			// ここでメモリに書き込むところを実装する
+			rd0<=1; wr0<=0;
 			ocx<=1;ocy<=0; // write mode
-			dix<=dx0;			
+			dix<=150;		
 
 			adrs<=cnt1+1;
 
