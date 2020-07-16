@@ -226,7 +226,7 @@ always @(posedge CLK) begin
 		if(timer==8191)begin
 			adrs<=cnt1;
 			ocx<=1;ocy<=0; // write mode
-			dix<=200;
+			dix<=wavg0/8;
 			//wall;
 			waved<=w40/16; // not display data 
 			cnt1<=cnt1+1;
@@ -278,6 +278,8 @@ always @(posedge CLK) begin
 	 
 	end
 	// 2020-06-30 change so that matching is 18
+
+	
 	else if (lx1==17 && wreq==0) begin
 		if(even==0) begin 
 			//lstat<=6;
@@ -306,7 +308,7 @@ always @(posedge CLK) begin
 
 		else if(even==3) begin
 			sum <=sum+dx0;
-			even <=even+1;
+			even <= even + 1;
 			cnt1<=cnt1+1;
 
 			// メモリの０から２の１８乗の間のメモリのところに実装するのでどうだろう
@@ -339,8 +341,14 @@ always @(posedge CLK) begin
 			cntmask<=cntmask-1;
 		end
 
+		else if (even == 100) begin
+			even <= 0;
+		end
+		else begin
+			even <= even + 1;
+		end
 
-	end
+	end	
 	else if (lx1==19 && wreq==0) begin
 		adrs<=262144; // reference area 
 	end
