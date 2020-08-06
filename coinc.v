@@ -321,46 +321,61 @@ always @(posedge CLK) begin
 	/////////////////////////
 	else if (lx1==17 && wreq==0) begin
 		cea <= 0; ceb <= 1; bh <= 0; bl <= 0;
+		// MEMORY SET 1 CLOCK
 		if(cnt==0) begin
 			adrs <= cnt1;
 			cnt <= cnt+1;
 		end
+		// READ MODE 2 CLOCKS
 		else if(cnt==1) begin
 			ocx <= 0; ocy <= 1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
 			cnt<=cnt+1;
 		end
 		else if(cnt==2) begin
-			dx0 <= DX+300;              // read memory data into register dx0
+			dx0 <= DX;              // read memory data into register dx0
 			cnt<=cnt+1;
 		end
+		// HIGH Z MODE 1 CLOCK
 		else if(cnt==3) begin
+			cnt <= cnt + 1;
+			ocx <= 1; ocy <= 1; // high-Z read			
+		end
+		// MEMORY SET 1 CLOCK
+		else if(cnt==4) begin
 			adrs <= cnt1 + 262144;
 			cnt <= cnt + 1;
 		end
-		else if(cnt==4) begin
-			dx1 <= DX + 500;
+		// READ MODE 2 CLOCKS
+		else if(cnt==5) begin
+			ocx <= 0; ocy <= 1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
+			cnt<=cnt+1;
+		end
+		else if(cnt==6) begin
+			dx1 <= DX;
 			cnt <= cnt + 1;
 		end
-		else if(cnt==5) begin
+		// HIGH Z MODE 1 CLOCK
+		else if(cnt==7) begin
 			adrs<=cnt1+1;
 			cnt <= cnt + 1;
 			ocx <= 1; ocy <= 1; // high-Z read
-			dix <= dx1;         // write memory data into memory
+			dix <= (dx1-dx0>0)?300:200;         // write memory data into memory
 		end
-		else if(cnt==6) begin
+		// WRITE MODE 2 CLOCKS
+		else if(cnt==8) begin
 			cnt <= cnt + 1;
 			ocx<=1;ocy<=0; // write mode
 		end
-		else if(cnt==8) begin
+		else if(cnt==10) begin
 			cnt <= cnt + 1;
 			ocx<=0;ocy<=1; // read mode
 		end
-		else if (cnt==9) begin
+		else if (cnt==11) begin
 			cnt <= cnt + 1;
 			ocx <= 0;ocy <= 1; // read mode
 			cnt1<=cnt1+2; // write in even address
 		end
-		else if (cnt == 10) begin
+		else if (cnt == 12) begin
 			cnt <= 0;
 		end
 		else begin
