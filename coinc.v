@@ -334,25 +334,33 @@ always @(posedge CLK) begin
 			cnt<=cnt+1;
 		end
 		else if(cnt==3) begin
+			adrs <= cnt1 + 262144;
+			cnt <= cnt + 1;
+		end
+		else if(cnt==4) begin
+			dx1 <= DX + 500;
+			cnt <= cnt + 1;
+		end
+		else if(cnt==5) begin
 			adrs<=cnt1+1;
 			cnt <= cnt + 1;
 			ocx <= 1; ocy <= 1; // high-Z read
-			dix <= dx0;         // write memory data into memory
-		end
-		else if(cnt==4) begin
-			cnt <= cnt + 1;
-			ocx<=1;ocy<=0; // write mode
+			dix <= dx1;         // write memory data into memory
 		end
 		else if(cnt==6) begin
 			cnt <= cnt + 1;
+			ocx<=1;ocy<=0; // write mode
+		end
+		else if(cnt==8) begin
+			cnt <= cnt + 1;
 			ocx<=0;ocy<=1; // read mode
 		end
-		else if (cnt==7) begin
+		else if (cnt==9) begin
 			cnt <= cnt + 1;
 			ocx <= 0;ocy <= 1; // read mode
 			cnt1<=cnt1+2; // write in even address
 		end
-		else if (cnt == 8) begin
+		else if (cnt == 10) begin
 			cnt <= 0;
 		end
 		else begin
