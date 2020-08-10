@@ -335,10 +335,10 @@ always @(posedge CLK) begin
 			dx0 <= DX;              // read memory data into register dx0
 			cnt<=cnt+1;
 		end
-		// HIGH Z MODE 1 CLOCK
+		// WAIT 1 CLOCK
 		else if(cnt==3) begin
 			cnt <= cnt + 1;
-			ocx <= 1; ocy <= 1; // high-Z read			
+			//ocx <= 1; ocy <= 1; // high-Z read			
 		end
 		// MEMORY SET 1 CLOCK
 		else if(cnt==4) begin
@@ -359,7 +359,7 @@ always @(posedge CLK) begin
 			adrs<=cnt1+1;
 			cnt <= cnt + 1;
 			ocx <= 1; ocy <= 1; // high-Z read
-			dix <= (dx1-dx0>0)?300:200;         // write memory data into memory
+			dix <= (dx0 > dx1) ? (dx0 - dx1) : (dx1 - dx0);
 		end
 		// WRITE MODE 2 CLOCKS
 		else if(cnt==8) begin
