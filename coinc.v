@@ -226,7 +226,7 @@ always @(posedge CLK) begin
 		if(timer==8191)begin
 			adrs<=cnt1;
 			ocx<=1;ocy<=0; // write mode
-			dix<=wavg0/8 - 100;
+			dix<=wavg0/8;
 			//wall;
 			waved<=w40/16; // not display data 
 			cnt1<=cnt1+1;
@@ -277,47 +277,9 @@ always @(posedge CLK) begin
 		//end
 	 
 	end
-	// 2020-06-30 change so that matching is 18
 
-	
-	//else if (lx1==17 && wreq==0) begin
-	//	cea <= 0; ceb <= 1; bh <= 0; bl <= 0;
-	//	if(cnt==0) begin 
-	//		ocx <= 0; ocy <= 1;
-	//		adrs <= cnt1;
-	//		cnt <= cnt+1;
-	//	end
-	//	else if(cnt==1) begin
-	//		//dx0 <= adrs + 300;
-	//		cnt<=cnt+1;
-	//		dx0 <= DX + 300;
-	//	end
-	//	else if(cnt==2) begin
-	//		cnt <= cnt + 1;
-	//		ocx <= 1; ocy <= 1;
-	//		adrs<=cnt1;
-	//		dix <= dx0;
-	//		cnt1<=cnt1+1;
-	//	end
-	//	else if(cnt==3) begin
-	//		cnt <= cnt + 1;
-	//		ocx<=1;ocy<=0;
-	//	end
-	//	else if (cnt==4) begin
-	//		cnt <= cnt + 1;
-	//		ocx <= 0;ocy <= 1;
-	//	end
-	//
-	//	else if (cnt == 5) begin
-	//		cnt <= 0;
-	//	end
-	//	else begin
-	//		cnt <= cnt + 1;
-	//	end
-
-	//end
 	/////////////////////////
-	// Prof. Takahashi Code//
+	// MATCHING: Comparing the two sets of data from different memory divisions //
 	/////////////////////////
 	else if (lx1==17 && wreq==0) begin
 		cea <= 0; ceb <= 1; bh <= 0; bl <= 0;
@@ -356,7 +318,7 @@ always @(posedge CLK) begin
 		end
 		// HIGH Z MODE 1 CLOCK
 		else if(cnt==7) begin
-			adrs<=cnt1+1;
+			adrs<=cnt1;
 			cnt <= cnt + 1;
 			ocx <= 1; ocy <= 1; // high-Z read
 			dix <= (dx0 > dx1) ? (dx0 - dx1) : (dx1 - dx0);
@@ -373,7 +335,7 @@ always @(posedge CLK) begin
 		else if (cnt==11) begin
 			cnt <= cnt + 1;
 			ocx <= 0;ocy <= 1; // read mode
-			cnt1<=cnt1+2; // write in even address
+			cnt1<=cnt1+1; // write in even address
 		end
 		else if (cnt == 12) begin
 			cnt <= 0;
