@@ -61,10 +61,11 @@ reg [15:0] dix;
 reg [7:0] dox;
 reg [15:0] dx0,dx1;
 
-reg [7:0] cnt; // was 25:0 before  
+reg [7:0] cnt; // was 25:0 before
+reg [11:0] shift_cnt; //to shift 4096 times, added on Aug. 11th 2020 
 reg [12:0] cntmask; // to skip data
 reg [4:0] cntusb;
-reg [17:0]cnt1; // changed to 1/4   to utilize quarter of the whole memory for each
+reg [17:0]adrs_cnt1; // changed to 1/4   to utilize quarter of the whole memory for each
 reg [17:0]cnt_round;
 reg [19:0]cnt2; // for clear command
 reg [15:0] wd;
@@ -188,7 +189,7 @@ always @(posedge CLK) begin
 		renewed<=0;
 		adrs<=0;
 		adrsrd<=0;
-		cnt1<=0;
+		adrs_cnt1<=0;
 		cnt<=0;
 		ocx<=0; ocy<=1;
 		wd<=0;
@@ -206,7 +207,7 @@ always @(posedge CLK) begin
 		rd0<=1; wr0<=0;
 		cntusb<=0;
 		ocr<=1; // slave mode address is set to the USB read
-		adrsrd<=0; translen<=0; adrs<=0; cnt<=0;cnt1<=0;wreq<=0; // for measurement
+		adrsrd<=0; translen<=0; adrs<=0; cnt<=0;adrs_cnt1<=0;wreq<=0; // for measurement
 		//   cntmask<=0; // skip mask
 		cntmask<=8191;
 	end
@@ -224,12 +225,12 @@ always @(posedge CLK) begin
 		timer<=timer+1;
 		// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
 		if(timer==8191)begin
-			adrs<=cnt1;
+			adrs<=adrs_cnt1;
 			ocx<=1;ocy<=0; // write mode
 			dix<=wavg0/8;
 			//wall;
 			waved<=w40/16; // not display data 
-			cnt1<=cnt1+1;
+			adrs_cnt1<=adrs_cnt1+1;
 			cntmask<=cntmask-1;
 			timer<=0;
 		end
@@ -244,12 +245,12 @@ always @(posedge CLK) begin
 		timer<=timer+1;
 		// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
 		if(timer==8191)begin
-			adrs<=cnt1+262144; // put data in the 2nd part of the quad memories
+			adrs<=adrs_cnt1+262144; // put data in the 2nd part of the quad memories
 			ocx<=1;ocy<=0; // write mode
 			dix<=wavg0/8;
 			//wall;
 			waved<=w40/16; // not display data 
-			cnt1<=cnt1+1;
+			adrs_cnt1<=adrs_cnt1+1;
 			cntmask<=cntmask-1;
 			timer<=0;
 		end
@@ -269,8 +270,8 @@ always @(posedge CLK) begin
 		//if (adc==1)begin
 
 		if(cntmask>0) begin
-			adrs<=cnt1;
-			cnt1<=cnt1+1;
+			adrs<=adrs_cnt1;
+			adrs_cnt1<=adrs_cnt1+1;
 
 			cntmask<=cntmask-1;
 		end
@@ -284,65 +285,74 @@ always @(posedge CLK) begin
 	else if (lx1==17 && wreq==0) begin
 		cea <= 0; ceb <= 1; bh <= 0; bl <= 0;
 		// MEMORY SET 1 CLOCK
-		if(cnt==0) begin
-			adrs <= cnt1;
-			cnt <= cnt+1;
-		end
-		// READ MODE 2 CLOCKS
-		else if(cnt==1) begin
-			ocx <= 0; ocy <= 1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-			cnt<=cnt+1;
-		end
-		else if(cnt==2) begin
-			dx0 <= DX;              // read memory data into register dx0
-			cnt<=cnt+1;
-		end
-		// WAIT 1 CLOCK
-		else if(cnt==3) begin
-			cnt <= cnt + 1;
-			//ocx <= 1; ocy <= 1; // high-Z read			
-		end
-		// MEMORY SET 1 CLOCK
-		else if(cnt==4) begin
-			adrs <= cnt1 + 262144;
-			cnt <= cnt + 1;
-		end
-		// READ MODE 2 CLOCKS
-		else if(cnt==5) begin
-			ocx <= 0; ocy <= 1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
-			cnt<=cnt+1;
-		end
-		else if(cnt==6) begin
-			dx1 <= DX;
-			cnt <= cnt + 1;
-		end
-		// HIGH Z MODE 1 CLOCK
-		else if(cnt==7) begin
-			adrs<=cnt1;
-			cnt <= cnt + 1;
-			ocx <= 1; ocy <= 1; // high-Z read
-			dix <= (dx0 > dx1) ? (dx0 - dx1) : (dx1 - dx0);
-		end
-		// WRITE MODE 2 CLOCKS
-		else if(cnt==8) begin
-			cnt <= cnt + 1;
-			ocx<=1;ocy<=0; // write mode
-		end
-		else if(cnt==10) begin
-			cnt <= cnt + 1;
-			ocx<=0;ocy<=1; // read mode
-		end
-		else if (cnt==11) begin
-			cnt <= cnt + 1;
-			ocx <= 0;ocy <= 1; // read mode
-			cnt1<=cnt1+1; // write in even address
-		end
-		else if (cnt == 12) begin
-			cnt <= 0;
-		end
-		else begin
-			cnt <= cnt + 1;
-		end
+		case(cnt)
+			0:
+				begin
+					adrs <= adrs_cnt1;
+					cnt <= cnt + 1;
+				end
+			1: // READ MODE
+				begin
+					ocx <= 0; ocy <= 1;
+					cnt <= cnt + 1;
+				end
+			2: // READ MODE
+				begin
+					dx0 <= DX;
+					cnt <= cnt + 1;
+				end
+			3: // READ MODE, WAIT
+				begin
+					cnt <= cnt + 1;
+				end
+			4: // READ MODE
+				begin
+					adrs <= adrs_cnt1 + 262144;
+					cnt <= cnt + 1;
+				end
+			5: // READ MODE
+				begin
+					ocx <= 0; ocy <= 1;
+					cnt <= cnt + 1;
+				end
+			6: // READ MODE
+				begin
+					dx1 <= DX;
+					cnt <= cnt + 1;
+				end
+			7: // HIGH Z, Calculation
+				begin
+					adrs <= adrs_cnt1;
+					cnt <= cnt + 1;
+					ocx <= 1; ocy <= 1;
+					dix <= (dx0 > dx1) ? (dx0 - dx1) : (dx1 - dx0);
+				end
+			8: // WRITE MODE
+				begin
+					cnt <= cnt + 1;
+					ocx <= 1; ocy <= 0;
+				end
+			9: // WRITE MODE
+				begin
+					cnt <= cnt + 1;
+				end
+			10: // READ MODE
+				begin
+					cnt <= cnt + 1;
+					ocx <= 0; ocy <= 1;
+				end
+			11: 
+				begin
+					cnt <= cnt + 1;
+					ocx <= 0; ocy <= 1;
+					adrs_cnt1 <= adrs_cnt1 + 1;
+				end
+			12:
+				begin
+					cnt <= 0;
+				end
+		endcase
+
 	end
 
 
