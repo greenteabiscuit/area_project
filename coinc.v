@@ -59,7 +59,7 @@ reg [9:0] w40;
 reg [7:0] translen;
 reg [15:0] dix;
 reg [7:0] dox;
-reg [15:0] dx0,dx1;
+reg [15:0] dx0,dx1,diff;
 
 reg [7:0] cnt; // was 25:0 before
 reg [11:0] shift_cnt; //to shift 4096 times, added on Aug. 11th 2020 
@@ -195,6 +195,7 @@ always @(posedge CLK) begin
 		wd<=0;
 		cea<=0; ceb<=1;
 		bh<=0; bl<=0;
+		sum <= 0;
 		wreq<=0; // for measurement
 		ledind<=0; //indicator OFF
 		waved<=0; // DEBUG DATA LED CLEAR
@@ -284,7 +285,14 @@ always @(posedge CLK) begin
 	/////////////////////////
 	else if (lx1==17 && wreq==0) begin
 		cea <= 0; ceb <= 1; bh <= 0; bl <= 0;
-		// MEMORY SET 1 CLOCK
+		// write in third sector of memory
+		//if (adrs_cnt1 == 262143) begin
+		//	shift_cnt <= shift_cnt + 1;     // shift to next point
+		//	adrs <= shift_cnt + 262144 * 2; // third sector of memory
+		//	adrs_cnt1 <= 0;                 // set adrs_cnt1 to 0
+		//	dix <= sum;
+		//end
+		
 		case(cnt)
 			0:
 				begin
@@ -307,7 +315,7 @@ always @(posedge CLK) begin
 				end
 			4: // READ MODE
 				begin
-					adrs <= adrs_cnt1 + 262144;
+					adrs <= adrs_cnt1 + 262144 + shift_cnt; // shift data by {shift_cnt}
 					cnt <= cnt + 1;
 				end
 			5: // READ MODE
@@ -320,39 +328,71 @@ always @(posedge CLK) begin
 					dx1 <= DX;
 					cnt <= cnt + 1;
 				end
-			7: // HIGH Z, Calculation
+			7:
+				begin
+					diff <= (dx0 > dx1) ? (dx0 - dx1) : (dx1 - dx0);
+					cnt <= cnt + 1;
+				end
+			8: // HIGH Z, Calculation
 				begin
 					adrs <= adrs_cnt1;
 					cnt <= cnt + 1;
 					ocx <= 1; ocy <= 1;
-					dix <= (dx0 > dx1) ? (dx0 - dx1) : (dx1 - dx0);
-				end
-			8: // WRITE MODE
-				begin
-					cnt <= cnt + 1;
-					ocx <= 1; ocy <= 0;
+					//dix <= diff
+					dix <= diff;
+					sum <= 300;
 				end
 			9: // WRITE MODE
 				begin
 					cnt <= cnt + 1;
+					ocx <= 1; ocy <= 0;
 				end
-			10: // READ MODE
+			10: // WRITE MODE
+				begin
+					cnt <= cnt + 1;
+				end
+			11: // READ MODE
 				begin
 					cnt <= cnt + 1;
 					ocx <= 0; ocy <= 1;
 				end
-			11: 
+			12: 
 				begin
 					cnt <= cnt + 1;
 					ocx <= 0; ocy <= 1;
 					adrs_cnt1 <= adrs_cnt1 + 1;
 				end
-			12:
+			13: // HIGH Z
+				begin
+					adrs <= 0;
+					cnt <= cnt + 1;
+					ocx <= 1; ocy <= 1;
+					dix <= sum;
+				end
+			14: // WRITE MODE
+				begin
+					cnt <= cnt + 1;
+					ocx <= 1; ocy <= 0;
+				end
+			15: // WRITE MODE
+				begin
+					cnt <= cnt + 1;
+				end
+			16: // READ MODE
+				begin
+					cnt <= cnt + 1;
+					ocx <= 0; ocy <= 1;
+				end
+			17: 
+				begin
+					cnt <= cnt + 1;
+					ocx <= 0; ocy <= 1;
+				end
+			18:
 				begin
 					cnt <= 0;
 				end
 		endcase
-
 	end
 
 
