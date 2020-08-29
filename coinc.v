@@ -340,7 +340,7 @@ always @(posedge CLK) begin
 					ocx <= 1; ocy <= 1;
 					//dix <= diff
 					dix <= diff;
-					sum <= 300;
+					sum <= sum + diff;
 				end
 			9: // WRITE MODE
 				begin
@@ -494,7 +494,3 @@ endmodule
 
 
 	// {{ALTERA_ARGS_BEGIN}} DO NOT REMOVE THIS LINE!
-	
-	// {{ALTERA_ARGS_END}} DO NOT REMOVE THIS LINE!
-	// {{ALTERA_IO_BEGIN}} DO NOT REMOVE THIS LINE!
-	// {{ALTERA_IO_END}} DO NOT REMOVE THIS LINE!f
