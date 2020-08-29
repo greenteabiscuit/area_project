@@ -86,7 +86,7 @@ reg [11:0] i; // for loop 0~4095
 reg [7:0] j; // for loop 0~255 
 reg [7:0] k; 
 reg [1:0] even;
-reg [7:0] phase;
+reg [14:0] phase;
 reg [9:0] round; // length of reference data
 //reg [7:0] wdata;
 
@@ -196,6 +196,7 @@ always @(posedge CLK) begin
 		cea<=0; ceb<=1;
 		bh<=0; bl<=0;
 		sum <= 0;
+		phase <= 0;
 		wreq<=0; // for measurement
 		ledind<=0; //indicator OFF
 		waved<=0; // DEBUG DATA LED CLEAR
@@ -315,7 +316,7 @@ always @(posedge CLK) begin
 				end
 			4: // READ MODE
 				begin
-					adrs <= adrs_cnt1 + 262144 + shift_cnt; // shift data by {shift_cnt}
+					adrs <= adrs_cnt1 + 262144 + phase; // shift data by {shift_cnt}
 					cnt <= cnt + 1;
 				end
 			5: // READ MODE
@@ -335,11 +336,10 @@ always @(posedge CLK) begin
 				end
 			8: // HIGH Z, Calculation
 				begin
-					adrs <= adrs_cnt1;
+					//adrs <= adrs_cnt1;
 					cnt <= cnt + 1;
 					ocx <= 1; ocy <= 1;
-					//dix <= diff
-					dix <= diff;
+					//dix <= diff;
 					sum <= sum + diff;
 				end
 			9: // WRITE MODE
@@ -364,7 +364,7 @@ always @(posedge CLK) begin
 				end
 			13: // HIGH Z
 				begin
-					adrs <= 0;
+					adrs <= 8200 + phase;
 					cnt <= cnt + 1;
 					ocx <= 1; ocy <= 1;
 					dix <= sum;
@@ -391,6 +391,11 @@ always @(posedge CLK) begin
 			18:
 				begin
 					cnt <= 0;
+					if (adrs_cnt1 == 8192) begin
+						adrs_cnt1 <= 0;
+						phase <= phase + 1;
+						sum <= 0;
+					end
 				end
 		endcase
 	end
