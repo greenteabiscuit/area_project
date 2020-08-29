@@ -382,6 +382,11 @@ always @(posedge CLK) begin
 				begin
 					cnt <= cnt + 1;
 					ocx <= 0; ocy <= 1;
+					if (adrs_cnt1 == 8192 - phase) begin
+						adrs_cnt1 <= 0;
+						phase <= phase + 1;
+						sum <= 0;
+					end
 				end
 			17: 
 				begin
@@ -391,11 +396,6 @@ always @(posedge CLK) begin
 			18:
 				begin
 					cnt <= 0;
-					if (adrs_cnt1 == 8192) begin
-						adrs_cnt1 <= 0;
-						phase <= phase + 1;
-						sum <= 0;
-					end
 				end
 		endcase
 	end
