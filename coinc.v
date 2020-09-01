@@ -254,7 +254,7 @@ always @(posedge CLK) begin
 				4:
 					begin
 						cnt <= cnt + 1;
-						adrs<=adrs_cnt1 + 262144;
+						adrs<=adrs_cnt1 + 8192;
 						ocx<=1;ocy<=0; // write mode
 						dix <= wavg0 / 8;
 						timer<=0;
@@ -347,7 +347,7 @@ always @(posedge CLK) begin
 				end
 			4: // READ MODE
 				begin
-					adrs <= adrs_cnt1 + 262144 + phase; // shift data by {shift_cnt}
+					adrs <= adrs_cnt1 + 8192 + phase; // shift data by {phase}
 					cnt <= cnt + 1;
 				end
 			5: // READ MODE
@@ -395,7 +395,7 @@ always @(posedge CLK) begin
 				end
 			13: // HIGH Z
 				begin
-					adrs <= 8200 + phase;
+					adrs <= 16384 + phase;
 					cnt <= cnt + 1;
 					ocx <= 1; ocy <= 1;
 					dix <= sum;
@@ -413,7 +413,7 @@ always @(posedge CLK) begin
 				begin
 					cnt <= cnt + 1;
 					ocx <= 0; ocy <= 1;
-					if (adrs_cnt1 == 8192 - phase) begin
+					if (adrs_cnt1 == 8192) begin
 						adrs_cnt1 <= 0;
 						phase <= phase + 1;
 						sum <= 0;
