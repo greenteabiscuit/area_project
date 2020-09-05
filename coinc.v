@@ -51,13 +51,12 @@ reg [19:0] adrs;
 reg [19:0] adrs1;
 reg [19:0] adrsrd;
 reg [23:0] sum; // to be compared with the discrimination level for the ID
-reg [23:0] wavg0,wavg1;
+reg [23:0] wavg0;
 reg [9:0] wlld; // Lower Level Discriminator
-reg [9:0] w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15,w16,w17,w18,w19;
-reg [9:0] w20,w21,w22,w23,w24,w25,w26,w27,w28,w29,w30,w31,w32,w33,w34,w35,w36,w37,w38,w39;
-reg [9:0] w40;
+reg [9:0] w0,w1,w2,w3,w4,w5,w6,w7,w8,w9;
 reg [7:0] translen;
 reg [15:0] dix;
+reg [15:0] tmp;
 reg [7:0] dox;
 reg [15:0] dx0,dx1,diff;
 
@@ -102,12 +101,7 @@ always @(posedge CLK) begin
 
 
 	if(adc==0 && adcl==0) begin
-	// FADC DATA REFRESH
-		w40<=w39;w39<=w38;w38<=w37;w37<=w36;w36<=w35;w35<=w34;w34<=w33;w33<=w32;w32<=w31;w31<=w30;
-		w30<=w29;w29<=w28;w28<=w27;w27<=w26;w26<=w25;w25<=w24;w24<=w23;w23<=w22;w22<=w21;w21<=w20;w20<=w19;
-		w19<=w18;w18<=w17;w17<=w16;w16<=w15;w15<=w14;w14<=w13;w13<=w12;w12<=w11;w11<=w10;
-		w10<=w9;w9<=w8;w8<=w7;w7<=w6;w6<=w5;w5<=w4;w4<=w3;w3<=w2;w2<=w1;w1<=w0;
-		wavg1<=(w39+w38+w37+w36+w35+w34+w33+w32);
+		w8<=w7;w7<=w6;w6<=w5;w5<=w4;w4<=w3;w3<=w2;w2<=w1;w1<=w0;
 		wavg0<=( w7+ w6+ w5+ w4+ w3+ w2+ w1+ w0);
 		w0<=WAVEX; 
 	end
@@ -115,19 +109,20 @@ always @(posedge CLK) begin
 		adc<=1-adc;			// ADC Clock = 62.5MHz
 	end
 	//overrides the command input
-	if (SWIN0==0) begin waved<=255; end 
+	//if (SWIN0==0) begin waved<=255; end 
 	// CHECK USB COMMAND and read into lx1
-	else if (RXF==0) begin	// RXF LOW if FIFO buffer of FT245 from PC is available 
+	//else
+	if (RXF==0) begin	// RXF LOW if FIFO buffer of FT245 from PC is available 
 		if (cntusb==0)begin	// counter clock to manipulate the data read
 			cntusb<=cntusb+1;			// even if data is already read, some delay might exist
 			rd0<=0; // read request
 		end
-		else if(cntusb==5)begin
+		else if(cntusb==5)begin //5
 			rd0<=1; 
 			cntusb<=cntusb+1;
 			lx1<=USBX; // read from FIFO after 50ns of rd signal
 		end
-		else if(cntusb==7)begin
+		else if(cntusb==7)begin //7
 			cntusb<=0; 
 		end
 		else begin
@@ -233,9 +228,10 @@ always @(posedge CLK) begin
 						cnt <= cnt + 1;
 						adrs<=adrs_cnt1;
 						ocx<=1;ocy<=0; // write mode
-						dix<=wavg0/8;
+						tmp <= wavg0 / 8;
+						dix <= tmp;
 						//wall;
-						waved<=w40/16; // not display data 
+						waved<=w9/16; // not display data 
 						cntmask<=cntmask-1;
 					end
 				1:
@@ -254,9 +250,9 @@ always @(posedge CLK) begin
 				4:
 					begin
 						cnt <= cnt + 1;
-						adrs<=adrs_cnt1 + 262144;
+						adrs<=adrs_cnt1 + 8192;
 						ocx<=1;ocy<=0; // write mode
-						dix <= wavg0 / 8;
+						dix <= tmp;
 						timer<=0;
 					end
 				5:
@@ -276,16 +272,47 @@ always @(posedge CLK) begin
 		cntusb<=0;
 		ledind<=1; // LED INDICATOR ON
 		timer<=timer+1;
-		// record at every 8 ns x 8192 = 64 us .. 16kHz sampling
+		// copy data from first division
 		if(timer==8191)begin
-			adrs<=adrs_cnt1+262144; // put data in the 2nd part of the quad memories
-			ocx<=1;ocy<=0; // write mode
-			dix<=wavg0/8;
-			//wall;
-			waved<=w40/16; // not display data 
-			adrs_cnt1<=adrs_cnt1+1;
-			cntmask<=cntmask-1;
-			timer<=0;
+         cea <= 0; ceb <= 1; bh <= 0; bl <= 0;
+
+         if(cnt==0) begin
+				adrs <= adrs_cnt1;
+				cnt <= cnt + 1;
+         end
+			else if(cnt==1) begin
+				ocx <= 0; ocy <= 1;// ^OE ocx=0: output enable , ^WE ocy=1: read mode
+				cnt <= cnt + 1;
+			end
+			else if(cnt==2) begin
+            dx0 <= DX;          // read memory data into register dx0
+				cnt <= cnt + 1;
+			end
+			else if(cnt==3) begin
+				adrs <= adrs_cnt1 + 8192;
+				cnt <= cnt + 1;
+				ocx <= 1; ocy <= 1; // high-Z read
+				dix <= dx0;         // write memory data into memory
+			end
+			else if(cnt==4) begin
+				cnt <= cnt + 1;
+				ocx<=1;ocy<=0; // write mode
+			end
+			else if(cnt==6) begin
+				cnt <= cnt + 1;
+				ocx<=0;ocy<=1; // read mode
+			end
+			else if (cnt==7) begin
+				cnt <= cnt + 1;
+				ocx <= 0;ocy <= 1; // read mode
+				adrs_cnt1 <= adrs_cnt1 + 1; // write in even address
+			end
+			else if (cnt == 8) begin
+				cnt <= 0;
+			end
+			else begin
+				cnt <= cnt + 1;
+			end
 		end
 
 	end
@@ -347,7 +374,7 @@ always @(posedge CLK) begin
 				end
 			4: // READ MODE
 				begin
-					adrs <= adrs_cnt1 + 262144 + phase; // shift data by {shift_cnt}
+					adrs <= adrs_cnt1 + 8192 + phase; // shift data by {phase}
 					cnt <= cnt + 1;
 				end
 			5: // READ MODE
@@ -367,11 +394,12 @@ always @(posedge CLK) begin
 				end
 			8: // HIGH Z, Calculation
 				begin
-					//adrs <= adrs_cnt1;
+					adrs <= 16384 + phase;
 					cnt <= cnt + 1;
 					ocx <= 1; ocy <= 1;
-					//dix <= diff;
+					//dix <= phase;
 					sum <= sum + diff;
+					dix <= sum;
 				end
 			9: // WRITE MODE
 				begin
@@ -395,10 +423,10 @@ always @(posedge CLK) begin
 				end
 			13: // HIGH Z
 				begin
-					adrs <= 8200 + phase;
+					//adrs <= 16384 + phase;
 					cnt <= cnt + 1;
 					ocx <= 1; ocy <= 1;
-					dix <= sum;
+					//dix <= sum;
 				end
 			14: // WRITE MODE
 				begin
@@ -413,7 +441,7 @@ always @(posedge CLK) begin
 				begin
 					cnt <= cnt + 1;
 					ocx <= 0; ocy <= 1;
-					if (adrs_cnt1 == 8192 - phase) begin
+					if (adrs_cnt1 == 8192) begin
 						adrs_cnt1 <= 0;
 						phase <= phase + 1;
 						sum <= 0;
@@ -462,22 +490,20 @@ always @(posedge CLK) begin
 			dox<=DX;
 			cnt<=cnt+1;
 		end
-		else if(cnt==4)begin //5
+		else if(cnt==4)begin //4
 			wr0<=0;					// T8 must be > 50ns
 			cnt<=cnt+1;
-			// status check
-			//if (dox==33) begin lstat<=1; end else if (dox==97) begin lstat<=7; end else begin lstat<=0; end
 		end
 		else if (cnt==11)begin		// T12 must be >80ns 11
-			//wr0<=1;
+			wr0<=1;
+			cnt<=cnt+1;
+		end
+		else if(cnt==13)begin //12
+							// T7 must be > 50ns
 			dox<=(DX>>8);
 			cnt<=cnt+1;
 		end
-		else if(cnt==12)begin //12
-			wr0<=1;					// T7 must be > 50ns
-			cnt<=cnt+1;
-		end
-		else if(cnt==17)begin //17
+		else if(cnt==18)begin //17
 			wr0<=0;					// T7 must be > 50ns 
 			cnt<=cnt+1;
 		end
